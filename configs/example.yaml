@@ -1,0 +1,4 @@
+# Placeholder Cyaichi harness configuration copied into a new session
+# when --config is omitted. Replace with a real profile for a scored run.
+name: example
+notes: not a production harness profile

@@ -1,0 +1,27 @@
+# scenario1 — DVWA on the baseline range.
+#
+# Merged on top of baseline/compose.yml by scripts/cyaichi-session.
+# Do not publish dvwa-host ports on the Docker host.
+
+services:
+  dvwa-host:
+    build:
+      context: ./hosts/dvwa
+    hostname: dvwa-host
+    cap_add:
+      - NET_ADMIN
+    dns:
+      - 172.30.10.4
+    environment:
+      HTTP_PROXY: http://172.30.10.3:3128
+      HTTPS_PROXY: http://172.30.10.3:3128
+      NO_PROXY: 172.30.0.0/16,lab,.lab,soc-host
+    networks:
+      net-asset:
+        ipv4_address: 172.30.10.10
+    volumes:
+      - ${SESSION_DIR}/data/dvwa:/var/lib/cyaichi
+    depends_on:
+      - firewall
+      - dns
+    restart: unless-stopped

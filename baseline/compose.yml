@@ -1,0 +1,146 @@
+# Baseline foundation. Always merged with a scenario compose file via
+# scripts/cyaichi-session. Do not publish tenant ports on the host.
+
+services:
+  firewall:
+    build:
+      context: ./firewall
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      net-asset:
+        ipv4_address: 172.30.10.2
+      net-attacker:
+        ipv4_address: 172.30.20.2
+      net-soc:
+        ipv4_address: 172.30.30.2
+      net-test:
+        ipv4_address: 172.30.40.2
+      net-egress:
+        ipv4_address: 172.30.50.2
+    volumes:
+      - ${SESSION_DIR}/data/firewall:/var/log/cyaichi
+    restart: unless-stopped
+
+  proxy:
+    build:
+      context: ./proxy
+    networks:
+      net-asset:
+        ipv4_address: 172.30.10.3
+      net-attacker:
+        ipv4_address: 172.30.20.3
+      net-soc:
+        ipv4_address: 172.30.30.3
+      net-egress:
+        ipv4_address: 172.30.50.3
+    volumes:
+      - ${SESSION_DIR}/data/proxy/squid.conf:/etc/squid/squid.conf:ro
+      - ${SESSION_DIR}/data/proxy/logs:/var/log/squid
+    depends_on:
+      - firewall
+    restart: unless-stopped
+
+  dns:
+    image: coredns/coredns:1.11.3
+    command: ["-conf", "/etc/coredns/Corefile"]
+    networks:
+      net-asset:
+        ipv4_address: 172.30.10.4
+      net-attacker:
+        ipv4_address: 172.30.20.4
+      net-soc:
+        ipv4_address: 172.30.30.4
+      net-egress:
+        ipv4_address: 172.30.50.4
+    volumes:
+      - ${SESSION_DIR}/data/dns/Corefile:/etc/coredns/Corefile:ro
+      - ${SESSION_DIR}/data/dns/hosts:/etc/coredns/hosts:ro
+    depends_on:
+      - firewall
+    restart: unless-stopped
+
+  ntp:
+    build:
+      context: ./ntp
+    networks:
+      net-egress:
+        ipv4_address: 172.30.50.5
+    depends_on:
+      - firewall
+    restart: unless-stopped
+
+  soc-host:
+    build:
+      context: ./hosts
+      dockerfile: soc/Dockerfile
+    hostname: soc-host
+    cap_add:
+      - NET_ADMIN
+    dns:
+      - 172.30.30.4
+    environment:
+      HTTP_PROXY: http://172.30.30.3:3128
+      HTTPS_PROXY: http://172.30.30.3:3128
+      NO_PROXY: 172.30.0.0/16,lab,.lab,soc-host,attacker-host
+    networks:
+      net-soc:
+        ipv4_address: 172.30.30.10
+    volumes:
+      - ${SESSION_DIR}/data/soc:/var/lib/cyaichi
+    depends_on:
+      - firewall
+      - dns
+      - proxy
+    restart: unless-stopped
+
+  attacker-host:
+    build:
+      context: ./hosts
+      dockerfile: attacker/Dockerfile
+    hostname: attacker-host
+    cap_add:
+      - NET_ADMIN
+    dns:
+      - 172.30.20.4
+    environment:
+      HTTP_PROXY: http://172.30.20.3:3128
+      HTTPS_PROXY: http://172.30.20.3:3128
+      NO_PROXY: 172.30.0.0/16,lab,.lab,dvwa-host,soc-host
+    networks:
+      net-attacker:
+        ipv4_address: 172.30.20.10
+    volumes:
+      - ${SESSION_DIR}/data/attacker:/var/lib/cyaichi
+    depends_on:
+      - firewall
+      - dns
+    restart: unless-stopped
+
+networks:
+  net-asset:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.10.0/24
+  net-attacker:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.20.0/24
+  net-soc:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.30.0/24
+  net-test:
+    ipam:
+      config:
+        - subnet: 172.30.40.0/24
+  net-egress:
+    ipam:
+      config:
+        - subnet: 172.30.50.0/24

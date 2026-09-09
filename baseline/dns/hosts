@@ -1,0 +1,6 @@
+172.30.30.10 soc-host soc-host.lab
+172.30.20.10 attacker-host attacker-host.lab
+172.30.50.2 firewall firewall.lab
+172.30.50.3 proxy proxy.lab
+172.30.50.4 dns dns.lab
+172.30.50.5 ntp ntp.lab

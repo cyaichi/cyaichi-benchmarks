@@ -1,0 +1,10 @@
+.:53 {
+    bind 0.0.0.0
+    hosts /etc/coredns/hosts {
+        fallthrough
+        ttl 30
+    }
+    forward . 1.1.1.1
+    cache 30
+    errors
+}
