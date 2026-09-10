@@ -4,7 +4,10 @@ Public tests and benchmarks for [Cyaichi](https://github.com/cyaichi/cyaichi) ha
 
 Cyaichi builds AI agent harnesses that stand up and run a cybersecurity defense program. This repo is where we test those harnesses, measure them, and publish the results so others can repeat the work.
 
-This project is public on purpose. Do not put secrets, customer data, live case files, or private telemetry here.
+This project is public on purpose. Do not put secrets, customer data, live
+case files, or private telemetry here. Do not publish attack campaign
+payloads or point at private sources for those payloads. The operator
+supplies campaigns at session time.
 
 The Cyaichi program itself lives in a separate private repo. This repo does not replace that program. It measures it.
 

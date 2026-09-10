@@ -1,0 +1,7 @@
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+StrictModes no
+HostKey /var/lib/cyaichi/ssh/ssh_host_ed25519_key

@@ -23,13 +23,21 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SESSIONS_ROOT = REPO_ROOT / "sessions"
 DATA_DIRS = (
-    "data/soc",
-    "data/attacker",
+    "data/soc/meta",
+    "data/soc/indexer",
+    "data/soc/filebeat",
+    "data/soc/ossec/queue",
+    "data/soc/ossec/logs",
+    "data/soc/ossec/api-configuration",
+    "data/attacker/ssh",
+    "keys",
     "data/firewall",
     "data/proxy/logs",
     "data/dns",
     "data/ntp",
-    "data/dvwa",
+    "data/dvwa/cyaichi",
+    "data/dvwa/ossec/queue",
+    "data/dvwa/ossec/logs",
     "results",
     "logs",
     "infra",
@@ -66,6 +74,131 @@ def read_dotenv(path: Path) -> dict[str, str]:
         key, _, value = line.partition("=")
         values[key.strip()] = value.strip()
     return values
+
+
+def indent_block(text: str, prefix: str = "  ") -> str:
+    lines = text.rstrip().splitlines()
+    return "\n".join(prefix + line if line else "" for line in lines)
+
+
+def freeze_versions(session_path: Path, scenario: str, stamp: str, sha: str) -> None:
+    """Write a session-local pin file. Git upgrades do not rewrite this copy."""
+    baseline_src = REPO_ROOT / "baseline" / "versions.yaml"
+    scenario_src = REPO_ROOT / "scenarios" / scenario / "versions.yaml"
+    if not baseline_src.is_file():
+        raise SessionError(f"missing {baseline_src}")
+    if not scenario_src.is_file():
+        raise SessionError(f"missing {scenario_src}")
+    baseline = baseline_src.read_text(encoding="utf-8")
+    scenario_text = scenario_src.read_text(encoding="utf-8")
+    body = (
+        "# Frozen at session create. This is the pin set for this run.\n"
+        f"# git baseline/versions.yaml and scenarios/{scenario}/versions.yaml\n"
+        "# may be upgraded later; they do not change this copy.\n"
+        f"recorded_at: {stamp}\n"
+        f"git_sha: {sha}\n"
+        f"scenario: {scenario}\n"
+        "\n"
+        "baseline:\n"
+        f"{indent_block(baseline)}\n"
+        "\n"
+        "scenario:\n"
+        f"{indent_block(scenario_text)}\n"
+    )
+    (session_path / "versions.yaml").write_text(body, encoding="utf-8")
+
+
+def write_harness_access(session_path: Path) -> None:
+    """Handoff file for Cyaichi agents. Lab defaults, not production secrets."""
+    (session_path / "harness.yaml").write_text(
+        """# Access for Cyaichi agents on this session. Lab defaults, not production.
+#
+# Wazuh has no static API-key scheme. The manager API issues a JWT:
+#   POST /security/user/authenticate  (HTTP basic user/password)
+#   then  Authorization: Bearer <jwt>
+# Tokens expire in 900s by default; refresh. Alert search is the indexer.
+
+dashboard:
+  url: https://127.0.0.1:8443
+  username: admin
+  password: admin
+
+manager_api:
+  url: https://127.0.0.1:55000
+  username: wazuh-wui
+  password: wazuh-wui
+  in_lab: https://172.30.30.10:55000
+
+indexer:
+  url: https://127.0.0.1:9200
+  username: admin
+  password: admin
+  in_lab: https://172.30.30.10:9200
+  alerts_index: wazuh-alerts-*
+
+tls:
+  verify: false
+""",
+        encoding="utf-8",
+    )
+
+
+def write_campaign_access(session_path: Path) -> None:
+    """Handoff for the adversary agent. Never copy this into harness.yaml."""
+    (session_path / "campaign-access.yaml").write_text(
+        """# Login for the adversary agent. Not for the scored harness.
+#
+# Private key: keys/attacker (session-local, gitignored). Host bind is
+# 127.0.0.1 only. net-test has no path to this SSH port.
+
+ssh:
+  host: 127.0.0.1
+  port: 2222
+  user: kali
+  identity_file: keys/attacker
+  extra_args: "-o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes"
+""",
+        encoding="utf-8",
+    )
+
+
+def ensure_attacker_login(session_path: Path) -> None:
+    """Mint a session SSH key for kali@attacker-host if one does not exist."""
+    keys_dir = session_path / "keys"
+    keys_dir.mkdir(parents=True, exist_ok=True)
+    keys_dir.chmod(0o700)
+    private = keys_dir / "attacker"
+    public = keys_dir / "attacker.pub"
+    if not private.is_file():
+        try:
+            subprocess.run(
+                [
+                    "ssh-keygen",
+                    "-t",
+                    "ed25519",
+                    "-f",
+                    str(private),
+                    "-N",
+                    "",
+                    "-C",
+                    f"cyaichi-{session_path.name}",
+                    "-q",
+                ],
+                check=True,
+            )
+        except FileNotFoundError as exc:
+            raise SessionError("ssh-keygen is not installed or not on PATH") from exc
+        except subprocess.CalledProcessError as exc:
+            raise SessionError("ssh-keygen failed to create the attacker key") from exc
+        private.chmod(0o600)
+        if public.is_file():
+            public.chmod(0o644)
+    auth = session_path / "data" / "attacker" / "ssh" / "authorized_keys"
+    auth.parent.mkdir(parents=True, exist_ok=True)
+    if public.is_file():
+        shutil.copyfile(public, auth)
+        auth.chmod(0o644)
+    write_campaign_access(session_path)
 
 
 def write_json(path: Path, data: dict) -> None:
@@ -162,6 +295,14 @@ def create_session(scenario: str, config: Path | None, session_id: str | None) -
     for rel in DATA_DIRS:
         (path / rel).mkdir(parents=True, exist_ok=True)
     (path / "data" / "proxy" / "logs").chmod(0o777)
+    for rel in (
+        "data/soc/ossec/client.keys",
+        "data/dvwa/ossec/client.keys",
+    ):
+        keys = path / rel
+        keys.parent.mkdir(parents=True, exist_ok=True)
+        keys.touch()
+        keys.chmod(0o640)
 
     shutil.copytree(REPO_ROOT / "baseline", path / "infra" / "baseline")
     shutil.copytree(src, path / "infra" / scenario)
@@ -172,7 +313,12 @@ def create_session(scenario: str, config: Path | None, session_id: str | None) -
         raise SessionError(f"config not found: {config_src}")
     shutil.copyfile(config_src, path / "cyaichi.yaml")
 
-    project = f"cyaichi-{sid}"
+    sha = git_sha()
+    freeze_versions(path, scenario, stamp, sha)
+    write_harness_access(path)
+    ensure_attacker_login(path)
+
+    project = f"cyaichi-{sid.lower()}"
     (path / ".env").write_text(
         f"SESSION_DIR={path}\nSCENARIO={scenario}\nCOMPOSE_PROJECT_NAME={project}\n",
         encoding="utf-8",
@@ -183,9 +329,10 @@ def create_session(scenario: str, config: Path | None, session_id: str | None) -
             "id": sid,
             "scenario": scenario,
             "created_at": stamp,
-            "git_sha": git_sha(),
+            "git_sha": sha,
             "compose_project": project,
             "cyaichi_config": "cyaichi.yaml",
+            "versions": "versions.yaml",
             "state": "created",
         },
     )
@@ -204,6 +351,8 @@ def cmd_create(args: argparse.Namespace) -> int:
 
 def cmd_resume(args: argparse.Namespace) -> int:
     path = session_dir(args.session_id)
+    write_harness_access(path)
+    ensure_attacker_login(path)
     compose(path, "up", "-d", "--build")
     patch_metadata(path, state="up", last_up_at=utc_stamp())
     print(f"resumed {path.name}")
@@ -215,6 +364,34 @@ def cmd_stop(args: argparse.Namespace) -> int:
     compose(path, "down", "--remove-orphans")
     patch_metadata(path, state="down", last_down_at=utc_stamp())
     print(f"stopped {path.name} (session kept)")
+    return 0
+
+
+def cmd_delete(args: argparse.Namespace) -> int:
+    path = session_dir(args.session_id)
+    try:
+        compose(path, "down", "--remove-orphans")
+    except SessionError:
+        pass
+    # Bind mounts are often root-owned from container processes.
+    subprocess.run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            f"{path}:/s",
+            "alpine:3.20",
+            "chmod",
+            "-R",
+            "a+rwX",
+            "/s",
+        ],
+        check=False,
+        capture_output=True,
+    )
+    shutil.rmtree(path)
+    print(f"deleted {path.name}")
     return 0
 
 
@@ -267,6 +444,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     stop.add_argument("session_id")
     stop.set_defaults(func=cmd_stop)
+
+    delete = sub.add_parser(
+        "delete",
+        help="stop containers and remove the session directory",
+    )
+    delete.add_argument("session_id")
+    delete.set_defaults(func=cmd_delete)
 
     listing = sub.add_parser("list", help="list sessions on disk")
     listing.set_defaults(func=cmd_list)

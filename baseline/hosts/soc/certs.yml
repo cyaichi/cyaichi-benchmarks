@@ -1,0 +1,11 @@
+# Lab certificates for the all-in-one soc-host. Not a public CA.
+nodes:
+  indexer:
+    - name: indexer
+      ip: "127.0.0.1"
+  server:
+    - name: server
+      ip: "127.0.0.1"
+  dashboard:
+    - name: dashboard
+      ip: "172.30.30.10"

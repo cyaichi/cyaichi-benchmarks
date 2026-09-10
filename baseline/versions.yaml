@@ -1,0 +1,42 @@
+# Software pins for the baseline range.
+#
+# Edit this file when a baseline component is upgraded. `create` freezes a
+# copy into the session (`versions.yaml` at the session root, plus this file
+# under `infra/baseline/`). Existing sessions keep the pins they were
+# created with.
+#
+# Tags here must match `compose.yml` and the Dockerfiles in this directory.
+
+schema: 1
+
+images:
+  alpine: alpine:3.20
+  ubuntu: ubuntu:24.04
+  kali: kalilinux/kali-last-release
+  coredns: coredns/coredns:1.11.3
+
+components:
+  firewall:
+    base: alpine
+    packages: [iptables, ip6tables, iproute2]
+  proxy:
+    base: alpine
+    squid: null
+  ntp:
+    base: alpine
+    chrony: null
+  dns:
+    image: coredns
+  soc-host:
+    base: ubuntu
+    wazuh: "4.14.7"
+    wazuh_indexer: "4.14.7-1"
+    wazuh_manager: "4.14.7-1"
+    wazuh_dashboard: "4.14.7-1"
+    filebeat: "7.10.2-2"
+  wazuh-agent:
+    package: "4.14.7-1"
+    enrolls_to: soc-host
+  attacker-host:
+    base: kali
+    packages: [openssh-server, sudo]

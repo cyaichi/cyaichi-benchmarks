@@ -1,0 +1,15 @@
+# Software this scenario adds on top of baseline/versions.yaml.
+#
+# Frozen into the session at create, next to the baseline pins. A Wazuh
+# agent on dvwa-host should match the manager version on soc-host once
+# both are installed.
+
+schema: 1
+
+images:
+  dvwa: ghcr.io/digininja/dvwa:latest
+
+components:
+  dvwa-host:
+    base: dvwa
+    wazuh_agent: "4.14.7-1"

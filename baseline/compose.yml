@@ -1,10 +1,10 @@
 # Baseline foundation. Always merged with a scenario compose file via
-# scripts/cyaichi-session. Do not publish tenant ports on the host.
+# scripts/cyaichi-session. Tenant service ports bind 127.0.0.1 only.
 
 services:
   firewall:
     build:
-      context: ./firewall
+      context: ${SESSION_DIR}/infra/baseline/firewall
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -27,7 +27,7 @@ services:
 
   proxy:
     build:
-      context: ./proxy
+      context: ${SESSION_DIR}/infra/baseline/proxy
     networks:
       net-asset:
         ipv4_address: 172.30.10.3
@@ -65,7 +65,7 @@ services:
 
   ntp:
     build:
-      context: ./ntp
+      context: ${SESSION_DIR}/infra/baseline/ntp
     networks:
       net-egress:
         ipv4_address: 172.30.50.5
@@ -75,7 +75,7 @@ services:
 
   soc-host:
     build:
-      context: ./hosts
+      context: ${SESSION_DIR}/infra/baseline/hosts
       dockerfile: soc/Dockerfile
     hostname: soc-host
     cap_add:
@@ -85,12 +85,31 @@ services:
     environment:
       HTTP_PROXY: http://172.30.30.3:3128
       HTTPS_PROXY: http://172.30.30.3:3128
-      NO_PROXY: 172.30.0.0/16,lab,.lab,soc-host,attacker-host
+      NO_PROXY: localhost,127.0.0.1,::1,172.30.0.0/16,lab,.lab,soc-host,attacker-host
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 655360
+        hard: 655360
+    shm_size: 512mb
     networks:
       net-soc:
         ipv4_address: 172.30.30.10
+      net-bind: {}
+    ports:
+      - "127.0.0.1:8443:443"
+      - "127.0.0.1:55000:55000"
+      - "127.0.0.1:9200:9200"
     volumes:
-      - ${SESSION_DIR}/data/soc:/var/lib/cyaichi
+      - ${SESSION_DIR}/data/soc/meta:/var/lib/cyaichi
+      - ${SESSION_DIR}/data/soc/indexer:/var/lib/wazuh-indexer
+      - ${SESSION_DIR}/data/soc/filebeat:/var/lib/filebeat
+      - ${SESSION_DIR}/data/soc/ossec/queue:/var/ossec/queue
+      - ${SESSION_DIR}/data/soc/ossec/logs:/var/ossec/logs
+      - ${SESSION_DIR}/data/soc/ossec/api-configuration:/var/ossec/api/configuration
+      - ${SESSION_DIR}/data/soc/ossec/client.keys:/var/ossec/etc/client.keys
     depends_on:
       - firewall
       - dns
@@ -99,7 +118,7 @@ services:
 
   attacker-host:
     build:
-      context: ./hosts
+      context: ${SESSION_DIR}/infra/baseline/hosts
       dockerfile: attacker/Dockerfile
     hostname: attacker-host
     cap_add:
@@ -113,6 +132,9 @@ services:
     networks:
       net-attacker:
         ipv4_address: 172.30.20.10
+      net-bind: {}
+    ports:
+      - "127.0.0.1:2222:22"
     volumes:
       - ${SESSION_DIR}/data/attacker:/var/lib/cyaichi
     depends_on:
@@ -144,3 +166,6 @@ networks:
     ipam:
       config:
         - subnet: 172.30.50.0/24
+  # Not a tenant. Docker cannot publish host ports from `internal` networks;
+  # this bridge exists so 127.0.0.1 binds on soc-host and attacker-host work.
+  net-bind: {}

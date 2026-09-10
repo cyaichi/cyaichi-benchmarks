@@ -2,26 +2,39 @@
 #
 # Merged on top of baseline/compose.yml by scripts/cyaichi-session.
 # Do not publish dvwa-host ports on the Docker host.
+# Build context is session infra/ so the image can COPY the baseline
+# Wazuh agent installer (version-pinned with soc-host).
 
 services:
   dvwa-host:
     build:
-      context: ./hosts/dvwa
+      context: ${SESSION_DIR}/infra
+      dockerfile: scenario1/hosts/dvwa/Dockerfile
     hostname: dvwa-host
     cap_add:
       - NET_ADMIN
     dns:
       - 172.30.10.4
+    ulimits:
+      nofile:
+        soft: 655360
+        hard: 655360
     environment:
       HTTP_PROXY: http://172.30.10.3:3128
       HTTPS_PROXY: http://172.30.10.3:3128
-      NO_PROXY: 172.30.0.0/16,lab,.lab,soc-host
+      NO_PROXY: localhost,127.0.0.1,::1,172.30.0.0/16,lab,.lab,soc-host
+      WAZUH_MANAGER: "172.30.30.10"
+      WAZUH_AGENT_NAME: dvwa-host
     networks:
       net-asset:
         ipv4_address: 172.30.10.10
     volumes:
-      - ${SESSION_DIR}/data/dvwa:/var/lib/cyaichi
+      - ${SESSION_DIR}/data/dvwa/cyaichi:/var/lib/cyaichi
+      - ${SESSION_DIR}/data/dvwa/ossec/queue:/var/ossec/queue
+      - ${SESSION_DIR}/data/dvwa/ossec/logs:/var/ossec/logs
+      - ${SESSION_DIR}/data/dvwa/ossec/client.keys:/var/ossec/etc/client.keys
     depends_on:
       - firewall
       - dns
+      - soc-host
     restart: unless-stopped

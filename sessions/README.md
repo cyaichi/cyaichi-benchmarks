@@ -5,5 +5,6 @@ one run of a scenario with one Cyaichi config: its own Compose project, bind
 mounts, config copy, and results.
 
 Sessions are not deleted by `stop`. Resume with `resume` on the same id.
+Remove a run with `delete`.
 
 See [docs/sessions.md](../docs/sessions.md).

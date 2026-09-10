@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
-echo 1 >/proc/sys/net/ipv4/ip_forward
+# ip_forward comes from Compose sysctls; /proc is read-only in this netns.
 
 iptables -F
 iptables -t nat -F
@@ -27,8 +27,8 @@ iptables -A FORWARD -s 172.30.10.0/24 -d 172.30.30.10 -p udp --dport 1514 -j ACC
 # SIEM/SOAR named actions -> asset
 iptables -A FORWARD -s 172.30.30.0/24 -d 172.30.10.0/24 -p tcp -m multiport --dports 22,1514,1515 -j ACCEPT
 
-# Test environment -> SIEM API (harness)
-iptables -A FORWARD -s 172.30.40.0/24 -d 172.30.30.10 -p tcp -m multiport --dports 443,55000 -j ACCEPT
+# Test environment -> SIEM (dashboard, manager API, indexer search)
+iptables -A FORWARD -s 172.30.40.0/24 -d 172.30.30.10 -p tcp -m multiport --dports 443,55000,9200 -j ACCEPT
 
 # Tenants -> DNS / NTP / HTTP proxy on net-egress
 for src in 172.30.10.0/24 172.30.20.0/24 172.30.30.0/24; do

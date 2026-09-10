@@ -39,7 +39,7 @@ Orchestrator and observer run on the host, not on a lab network.
 | Role | Where | Job | The harness may |
 | --- | --- | --- | --- |
 | **Asset** | `net-asset` | Intentionally vulnerable service(s) under defense (DVWA, Juice Shop, later AD). Sensors sit here with the hosts they watch. | Observe through telemetry and approved response actions. Not treat it as a public website. |
-| **Adversary** | `net-attacker` | Starts attacks on a schedule so we can measure response. | Never see it, name it, or route to it. |
+| **Adversary** | `net-attacker` | Adversary agent on the Kali campaign host. Starts attacks on a schedule so we can measure response. | Never see it, name it, or route to it. |
 | **SOC** | `net-soc` | SIEM to store/search/alert, plus a SOAR-shaped action bus. | Use the documented APIs. May add detections and playbooks. |
 | **Test environment** | `net-test` | The harness under test, and the only inbound source into the tenants. | Live here. Talk to the SOC API, not to raw container nets. |
 | **Egress** | `net-egress` | HTTP(S) proxy, DNS recursor, internal NTP, optional simulated internet. | Not a target. Going around it is a fail. |
@@ -99,7 +99,7 @@ Times come from the host clock (NTP in the lab syncs from there).
 | Need | Who | How |
 | --- | --- | --- |
 | Lifecycle | Orchestrator | `docker compose` via `scripts/cyaichi_session.py` |
-| Release the campaign | Orchestrator | `docker exec` on `attacker-host`, or a control port only that uid may open |
+| Release the campaign | Orchestrator or adversary agent | `docker exec` on `attacker-host`, or SSH as `kali` on `127.0.0.1:2222` with the session key (not the scored harness) |
 | Health / availability | Observer | Probe checkers from the host (not via the SIEM) |
 | Campaign outcome | Observer | Did the adversary's success criteria still hold, from evidence the observer collected |
 | Ground truth files | Observer | On the host, not in a volume the harness can read |
@@ -253,9 +253,11 @@ owns Compose.
 3. **Hosted leaderboard.** Range in a private VPC. Orchestrator is the eval
    job that starts the harness; observer publishes scores.
 
-The harness contract is a versioned HTTP API (search, get alert, run named
-action), not "you are on the network, go explore," and not an orchestrator
-RPC.
+The harness contract in v1 is the native Wazuh manager API (JWT from a
+lab user/password) plus indexer search. A later versioned wrapper (search,
+get alert, run named action, one session token) can sit in front of that
+without changing the range. It is not "you are on the network, go explore,"
+and not an orchestrator RPC.
 
 ## Scenario lifecycle
 
@@ -318,7 +320,7 @@ Start with a **web application under attack**, not Active Directory.
 v1 is still many containers: firewall, proxy, DNS, NTP, soc-host,
 attacker-host, and (in scenario1) dvwa-host. Orchestrator and observer are
 host processes, not containers. Budget RAM on the order of 8–16 GiB once
-Wazuh is installed on soc-host. Sessions stay on disk after `stop` so a run
+Wazuh 4.14.7 is installed on soc-host. Sessions stay on disk after `stop` so a run
 can be resumed.
 
 Damn Vulnerable Active Directory is a **Windows domain**, typically several
@@ -334,13 +336,16 @@ and CI runners. Rules:
 - Lab credentials live in the scenario and are not production credentials.
 - No tenant publishes a host port on a public interface. `net-test` binds to
   localhost or a VPN.
-- Attack scripts, compose files, and ground truth stay on the host with the
-  orchestrator and observer. They are not mounted into the harness.
+- Attack campaign payloads are not published in this repository. The
+  operator supplies them at session time. They are not mounted into the
+  harness. Compose files and ground truth that stay on the host with the
+  orchestrator and observer are the range fixture, not a published exploit
+  kit.
+- Published materials describe campaigns at the technique/stage level. They
+  do not ship copy-paste exploit tutorials.
 - SOAR does not get the Docker socket. Named actions only. The harness uid
   and the observer uid do not get the Docker socket either.
 - Attacker egress never includes the real internet.
-- Published materials describe campaigns at the technique/stage level. They
-  do not ship copy-paste exploit tutorials.
 
 A defense that discovers the attacker network, Compose, the firewall admin,
 or ground truth has failed the scenario, even if the asset looks quiet.
