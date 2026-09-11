@@ -30,6 +30,7 @@ services:
         ipv4_address: 172.30.10.10
     volumes:
       - ${SESSION_DIR}/data/dvwa/cyaichi:/var/lib/cyaichi
+      - ${SESSION_DIR}/data/dvwa/mysql:/var/lib/mysql
       - ${SESSION_DIR}/data/dvwa/ossec/queue:/var/ossec/queue
       - ${SESSION_DIR}/data/dvwa/ossec/logs:/var/ossec/logs
       - ${SESSION_DIR}/data/dvwa/ossec/client.keys:/var/ossec/etc/client.keys

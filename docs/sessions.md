@@ -51,7 +51,7 @@ services plus the two Linux hosts that every scenario reuses.
 | `dns` | *.4 on tenant nets + egress | Lab names; external recurse only from `net-egress` |
 | `ntp` | 172.30.50.5 | Serves the host clock to tenants |
 | `soc-host` | 172.30.30.10 | Linux host that runs Wazuh (SIEM/SOAR) |
-| `attacker-host` | 172.30.20.10 | Kali Linux host that runs the campaign |
+| `attacker-host` | 172.30.20.10 | Kali Linux host (`kali-linux-everything`) that runs the campaign |
 
 The scored defense harness never receives attacker login material. The
 adversary agent logs in over SSH as `kali` on `127.0.0.1:2222` using the
@@ -85,7 +85,8 @@ hands agents the native Wazuh endpoints.
 ## scenario1
 
 Adds `dvwa-host` at 172.30.10.10 on `net-asset`, lab DNS name
-`dvwa-host.lab`, and a Wazuh agent (same 4.14.7 pin as the manager) that
+`dvwa-host.lab`, MariaDB on loopback (the published DVWA image has no
+database), and a Wazuh agent (same 4.14.7 pin as the manager) that
 enrolls toward `soc-host`. The scored campaign is scenario-specific and
 stays off the harness mounts.
 

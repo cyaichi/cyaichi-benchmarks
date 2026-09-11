@@ -36,6 +36,7 @@ DATA_DIRS = (
     "data/dns",
     "data/ntp",
     "data/dvwa/cyaichi",
+    "data/dvwa/mysql",
     "data/dvwa/ossec/queue",
     "data/dvwa/ossec/logs",
     "results",

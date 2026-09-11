@@ -13,3 +13,4 @@ components:
   dvwa-host:
     base: dvwa
     wazuh_agent: "4.14.7-1"
+    mariadb: distro

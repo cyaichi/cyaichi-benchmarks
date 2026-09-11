@@ -17,12 +17,17 @@ RUN apt-get update \
 COPY baseline/hosts/agent/ /cyaichi/agent/
 COPY scenario1/hosts/dvwa/route-via-fw.sh /cyaichi/route-via-fw.sh
 COPY scenario1/hosts/dvwa/entrypoint.sh /cyaichi/entrypoint.sh
+COPY scenario1/hosts/dvwa/install-mariadb.sh /cyaichi/install-mariadb.sh
+COPY scenario1/hosts/dvwa/start-mariadb.sh /cyaichi/start-mariadb.sh
 RUN chmod 755 /cyaichi/agent/policy-rc.d \
       /cyaichi/agent/install-wazuh-agent.sh \
       /cyaichi/agent/start-wazuh-agent.sh \
       /cyaichi/route-via-fw.sh \
       /cyaichi/entrypoint.sh \
-    && /cyaichi/agent/install-wazuh-agent.sh
+      /cyaichi/install-mariadb.sh \
+      /cyaichi/start-mariadb.sh \
+    && /cyaichi/agent/install-wazuh-agent.sh \
+    && /cyaichi/install-mariadb.sh
 
 ENTRYPOINT ["/cyaichi/entrypoint.sh"]
 CMD ["apache2-foreground"]

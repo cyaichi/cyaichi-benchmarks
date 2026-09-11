@@ -12,5 +12,6 @@ python3 scripts/cyaichi_session.py create scenario1 --config configs/example.yam
 ```
 
 DVWA stays unpublished on the host. Default upstream lab credentials apply
-inside the range only. The host runs the baseline-pinned Wazuh agent and
+inside the range only. The host runs MariaDB on loopback (the published
+DVWA image is PHP/Apache only) plus the baseline-pinned Wazuh agent, which
 enrolls to `soc-host` (172.30.30.10).

@@ -39,4 +39,4 @@ components:
     enrolls_to: soc-host
   attacker-host:
     base: kali
-    packages: [openssh-server, sudo]
+    packages: [kali-linux-everything, openssh-server, sudo]
